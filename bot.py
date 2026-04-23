@@ -11,7 +11,10 @@ from coach import Coach
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
+_channel_id_raw = os.getenv("DISCORD_CHANNEL_ID")
+if not _channel_id_raw:
+    raise RuntimeError("DISCORD_CHANNEL_ID is not set in environment variables")
+CHANNEL_ID = int(_channel_id_raw.strip())
 
 ACTIVITY_KEYWORDS = {
     "activit", "run", "ran", "ride", "rode", "cycl", "swim", "swam",
