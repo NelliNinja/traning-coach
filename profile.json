@@ -1,0 +1,11 @@
+{
+  "name": "Your Name",
+  "age": null,
+  "weight_kg": null,
+  "height_cm": null,
+  "resting_heart_rate": null,
+  "max_heart_rate": null,
+  "fitness_goals": "Describe your goals here",
+  "preferred_activities": ["running", "cycling"],
+  "notes": "Any additional info: injuries, preferences, experience level, etc."
+}
