@@ -12,19 +12,30 @@ TOKEN_FILE = "strava_tokens.json"
 
 
 def load_tokens():
+    # Prefer local file (dev), fall back to env vars (Railway/production)
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE) as f:
             return json.load(f)
+    refresh_token = os.getenv("STRAVA_REFRESH_TOKEN")
+    if refresh_token:
+        return {
+            "refresh_token": refresh_token,
+            "access_token": os.getenv("STRAVA_ACCESS_TOKEN", ""),
+            "expires_at": 0,  # force refresh on first use
+        }
     return None
 
 
 def save_tokens(data):
-    with open(TOKEN_FILE, "w") as f:
-        json.dump({
-            "access_token": data["access_token"],
-            "refresh_token": data["refresh_token"],
-            "expires_at": data["expires_at"],
-        }, f)
+    tokens = {
+        "access_token": data["access_token"],
+        "refresh_token": data["refresh_token"],
+        "expires_at": data["expires_at"],
+    }
+    if os.path.exists(TOKEN_FILE) or not os.getenv("STRAVA_REFRESH_TOKEN"):
+        with open(TOKEN_FILE, "w") as f:
+            json.dump(tokens, f)
+    # On Railway, tokens are kept in memory via the returned value
 
 
 def get_access_token():
