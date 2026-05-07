@@ -1,5 +1,6 @@
 import os
 import time as time_module
+import logging
 import discord
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -7,6 +8,11 @@ from datetime import time
 from dotenv import load_dotenv
 from strava import get_today_activities, get_recent_activities, format_activity
 from coach import Coach
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
+MAX_INPUT_LEN = 2000
 
 load_dotenv()
 
@@ -47,6 +53,18 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 coach = Coach()
+
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandOnCooldown):
+        await interaction.response.send_message(
+            f"Slow down! Try again in {error.retry_after:.0f}s.", ephemeral=True
+        )
+    else:
+        logger.error("Slash command error: %s", error, exc_info=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message("Something went wrong. Please try again.", ephemeral=True)
 
 
 @bot.event
@@ -129,6 +147,7 @@ async def cmd_week(interaction: discord.Interaction):
 
 
 @bot.tree.command(name="refresh", description="Pull the latest activities from Strava")
+@app_commands.checks.cooldown(1, 60.0, key=lambda i: i.user.id)
 async def cmd_refresh(interaction: discord.Interaction):
     await interaction.response.defer()
     global _last_activity_fetch
@@ -149,9 +168,11 @@ async def cmd_refresh(interaction: discord.Interaction):
 
 @bot.tree.command(name="feeling", description="Tell the coach how you're feeling right now")
 @app_commands.describe(status="e.g. tired, stressed, great, sore legs")
+@app_commands.checks.cooldown(1, 15.0, key=lambda i: i.user.id)
 async def cmd_feeling(interaction: discord.Interaction, status: str):
     await interaction.response.defer()
-    reply = coach.chat(f"Right now I'm feeling: {status}")
+    safe_status = status[:MAX_INPUT_LEN]
+    reply = coach.chat(f"Right now I'm feeling: {safe_status}")
     await interaction.followup.send(reply)
 
 
@@ -201,11 +222,13 @@ async def on_message(message):
         try:
             if _message_mentions_activities(message.content):
                 await _refresh_activities()
-            reply = coach.chat(message.content)
+            user_input = message.content[:MAX_INPUT_LEN]
+            reply = coach.chat(user_input)
             for chunk in [reply[i:i+1900] for i in range(0, len(reply), 1900)]:
                 await message.reply(chunk)
         except Exception as e:
-            await message.reply(f"Something went wrong: {e}")
+            logger.error("on_message error: %s", e, exc_info=True)
+            await message.reply("Something went wrong. Please try again.")
 
     await bot.process_commands(message)
 
